@@ -1,9 +1,9 @@
-#https://blog.streamlit.io/how-to-build-a-real-time-live-dashboard-with-streamlit/
+#Reference: https://blog.streamlit.io/how-to-build-a-real-time-live-dashboard-with-streamlit/
 
-import numpy as np  # np mean, np random
-import pandas as pd  # read csv, df manipulation
+import numpy as np  
+import pandas as pd  
 import plotly.express as px  # interactive charts
-import streamlit as st  # 🎈 data web app development
+import streamlit as st  #  data web app development
 from datetime import datetime, timedelta
 from sklearn.model_selection import train_test_split
 import xgboost as xgb
@@ -11,10 +11,7 @@ from sklearn import metrics
 import yfinance as yf
 from sklearn.metrics import mean_squared_error
 
-
-#st.header('Daily SPY Price Predictor')
-
-st.set_page_config(page_title="Daily SPY Price Predictor",
+st.set_page_config(page_title="Daily SPY Open Price Predictor",
                  page_icon="🧊",
                  #layout="wide",
                  #initial_sidebar_state="expanded",
@@ -25,9 +22,10 @@ st.set_page_config(page_title="Daily SPY Price Predictor",
                  }
 )
 
+st.subheader('Daily SPY Open Price Predictor')
 
-start =  datetime(2022, 1, 1) + timedelta(days=1) #yyyy,mm,dd
-end = datetime.today() + timedelta(days=1)   #yfinance time varies from timezone, add 1 day to get latest 
+start =  datetime(2017, 1, 1) + timedelta(days=1) #yyyy,mm,dd
+end = datetime.today() + timedelta(days=1)   #yfinance time varies from markets timezone, add 1 day to get latest 
 
 alldf =pd.DataFrame()
 tickers = ['^AORD','^HSI','^N225','SPY','^GSPC','^IXIC','^DJI','^VIX','^FCHI','^FTSE','^GDAXI']
@@ -50,6 +48,10 @@ alldf = alldf.dropna()
 
 features = ['spy_lag1','aord','hsi','nikkei','sp500','nasdaq','dji','vix','cac40','FTSE 100','daxi' ]
 
+# Normalisation
+for name in features:
+    alldf[name] = (alldf[name] - alldf[name].mean()) / alldf[name].std()
+    
 X = alldf[features].iloc[:-1]  #When training model, can't use upto today's data 
 y = alldf['spy'].iloc[:-1]
 
@@ -118,11 +120,11 @@ elif job_filter == '1 Day':
 
 chart_date = test_period.date() 
 chart_df = alldf.loc[chart_date:, :]
-chart_df['predict_spy'] = model.predict(chart_df[features])
+
+chart_df['predict_spy'] = model.predict(chart_df.loc[:,features])
 chart_df['predict_spy_price'] = chart_df['predict_spy'] + chart_df['Price']
 chart_df['predict_price_error'] =  chart_df['Price'] - chart_df['predict_spy_price']
 
-#st.markdown(metric_df)
 placeholder = st.empty()
 
 with placeholder.container():
@@ -135,23 +137,22 @@ with placeholder.container():
     )
     
     col2.metric(
-        label= "Predicted SPY Price: ",
+        label= "Predicted SPY Open Price: ",
         value= round(float(chart_df['predict_spy_price'].iloc[-1:].values),2)
     )
     
     st.markdown("### SPY PRICE (ACTUAL VS PREDICT)")
-    #chart_data = pd.DataFrame(
-    #     np.random.randn(20, 3),
-    #     columns=['a', 'b', 'c'])
 
-    fig = px.line(chart_df, x=chart_df.index, y=["Price","predict_spy_price"], labels={"Price":'Actual SPY Price',"predict_spy_price":"Predict SPY Price"})
+    fig = px.line(chart_df, x=chart_df.index, 
+                  y=["Price","predict_spy_price"], 
+                  labels={"Price":'Actual SPY Price',"predict_spy_price":"Predict SPY Price"})
     series_names=['Actual SPY Price','Predict SPY Price']
     for idx, name in enumerate(series_names):
         fig.data[idx].name = name
     fig.update_traces(
         hovertemplate="<br>".join([
-            "Date: %{x}",
-            "Price: %{y:.2f}",
+                                    "Date: %{x}",
+                                    "Price: %{y:.2f}",
         ])
     )
     fig.update_yaxes(title_text="SPY Price", tickprefix="$")
@@ -172,26 +173,27 @@ with placeholder.container():
     
     # create 4 columns
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-
-    # fill in those three columns with respective metrics or KPIs
+    
     kpi1.metric(
         label="R2 Train⏳",
-        value= round(metric_df['Train']['R2'],3),
+        value= round(metric_df.loc['R2','Train'],3),
     )
     
     kpi2.metric(
         label="RMSE Train💍",
-        value=round(metric_df['Train']['RMSE'],3),
+        value=round(metric_df.loc['RMSE','Train'],3),
     )
 
     kpi3.metric(
         label="R2 Test⏳",
-        value= round(metric_df['Test']['R2'],3),
-        delta= round(metric_df['Test']['R2'] - metric_df['Train']['R2'],3),
+        value= round(metric_df.loc['R2','Test'],3),
+        delta= round(metric_df.loc['R2','Test'] - metric_df.loc['R2','Train'],3),
     )
     
     kpi4.metric(
         label="RMSE Test💍",
-        value=round(metric_df['Test']['RMSE'],3),
-        delta=round(metric_df['Test']['RMSE']-metric_df['Train']['RMSE'],3),
+        value=round(metric_df.loc['RMSE','Test'],3),
+        delta=round(metric_df.loc['RMSE','Test'] - metric_df.loc['RMSE','Train'],3),
     )
+    
+st.write("The information in this website is for information only, the author makes no representation or warranty or assurance as to its adequacy, completeness, accuracy or timeliness for any particular purpose. Opinions and estimates are subject to change without notice. The recommendation does not take into account the specific investment objectives, financial situation or particular needs of any particular person. Any past performance, projection, forecast or simulation of results is not necessarily indicative of the future or likely performance of any investment.")
